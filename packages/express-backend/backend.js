@@ -1,8 +1,10 @@
 import express from "express";
+import cors from "cors";
 
 const app = express();
 const port = 8000;
 
+app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -45,6 +47,7 @@ const findUserByName = (name) => {
   );
 };
 
+
 const findUserById = (id) =>
   users["users_list"].find((user) => user["id"] === id);
 
@@ -63,10 +66,25 @@ const addUser = (user) => {
   return user;
 };
 
+function generateId() {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '1234567890';
+  let id = '';
+
+  for (let i = 0; i < 3; i++) {
+    id += letters.charAt(Math.floor(Math.random()*letters.length));
+  }
+  for (let i = 0; i < 3; i++) {
+    id += numbers.charAt(Math.floor(Math.random()*numbers.length));
+  }
+  return id;
+}
+
 app.post("/users", (req, res) => {
   const userToAdd = req.body;
+  userToAdd.id = generateId();
   addUser(userToAdd);
-  res.send();
+  res.status(201).json(userToAdd);
 });
 
 const deleteUserById = (id) => {
@@ -83,12 +101,12 @@ app.delete("/users", (req, res) => {
   if (id !== undefined) {
       const success = deleteUserById(id);
       if (success) {
-        res.status(200).send('ID deleted');
+        res.status(200).send("ID successfully deleted.");
       } else {
-        res.status(404).send('ID not found');
+        res.status(404).send("ID not found.");
       }
   } else {
-    res.status(400).send('ID required to delete user');
+    res.status(400).send("ID required to delete user");
   }
 })
 
