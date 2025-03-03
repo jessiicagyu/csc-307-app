@@ -1,119 +1,93 @@
 import express from "express";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import cors from "cors";
+
 
 const app = express();
 const port = 8000;
 
 app.use(express.json());
+app.use(cors());
+
+dotenv.config();
+
+const { MONGO_CONNECTION_STRING } = process.env;
+
+mongoose.set("debug", true);
+mongoose
+  .connect(MONGO_CONNECTION_STRING)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((error) => console.log(error));
+
+const userSchema = new mongoose.Schema(
+  {
+    name: String,
+    job: String,
+  },
+  { collection: "users_list" }
+);
+
+const User = mongoose.model("User", userSchema);
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-const users = {
-  users_list: [
-    {
-      id: "xyz789",
-      name: "Charlie",
-      job: "Janitor"
-    },
-    {
-      id: "abc123",
-      name: "Mac",
-      job: "Bouncer"
-    },
-    {
-      id: "ppp222",
-      name: "Mac",
-      job: "Professor"
-    },
-    {
-      id: "yat999",
-      name: "Dee",
-      job: "Aspring actress"
-    },
-    {
-      id: "zap555",
-      name: "Dennis",
-      job: "Bartender"
+
+app.get("/users", async (req, res) => {
+  const { name, job } = req.query;
+  let filter = {};
+  if (name) filter.name = name;
+  if (job) filter.job = job;
+
+  try {
+    const users = await User.find(filter);
+    res.json({ users_list: users });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching users", error });
+  }
+});
+
+
+app.get("/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).send("User not found");
     }
-  ]
-};
-
-const findUserByName = (name) => {
-  return users["users_list"].filter(
-    (user) => user["name"] === name
-  );
-};
-
-const findUserById = (id) =>
-  users["users_list"].find((user) => user["id"] === id);
-
-app.get("/users/:id", (req, res) => {
-  const id = req.params["id"]; //or req.params.id
-  let result = findUserById(id);
-  if (result === undefined) {
-    res.status(404).send("Resource not found.");
-  } else {
-    res.send(result);
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user", error });
   }
 });
 
-const addUser = (user) => {
-  users["users_list"].push(user);
-  return user;
-};
 
-app.post("/users", (req, res) => {
-  const userToAdd = req.body;
-  addUser(userToAdd);
-  res.send();
-});
-
-const deleteUserById = (id) => {
-  const user = users["users_list"].find((user) => user["id"] === id);
-  if (user) {
-    users["users_list"] = users["users_list"].filter((user) => user["id"] !== id);
-    return true;
-  } 
-  return false;
-}
-
-app.delete("/users", (req, res) => {
-  const id = req.query.id;
-  if (id !== undefined) {
-      const success = deleteUserById(id);
-      if (success) {
-        res.status(200).send('ID deleted');
-      } else {
-        res.status(404).send('ID not found');
-      }
-  } else {
-    res.status(400).send('ID required to delete user');
-  }
-})
-
-const findUserByNameAndJob = (name, job) => {
-  return users["users_list"].filter(
-    (user) => user["name"] === name && user["job"] === job
-  );
-}
-
-app.get("/users", (req, res) => {
-  const name = req.query.name;
-  const job = req.query.job;
-  if (name && job) {
-    const result = findUserByNameAndJob(name, job);
-    res.send({users_list: result});
-  } else if (name) {
-    const result = findUserByName(name);
-    res.send({users_list: result});
-  } else {
-    res.send(users);
+app.post("/users", async (req, res) => {
+  try {
+    const newUser = new User(req.body);
+    await newUser.save();
+    res.status(201).json(newUser);
+  } catch (error) {
+    res.status(500).json({ message: "Error adding user", error });
   }
 });
+
+
+app.delete("/users/:id", async (req, res) => { 
+  try {
+    const result = await User.findByIdAndDelete(req.params.id);
+    
+    if (!result) {
+      return res.status(404).send("User not found");
+    }
+    res.status(200).send("User deleted");
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting user", error });
+  }
+});
+
 
 app.listen(port, () => {
-  console.log(
-    `Example app listening at http://localhost:${port}`
-  );
+  console.log(`Server running at http://localhost:${port}`);
 });
